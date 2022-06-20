@@ -1,7 +1,40 @@
+//------------------------------------
+//Experimental JSON features
+let statusJSON = '';
+let statusObject = {};
+
+function nthOcurrence(str, needle, nth) {
+  for (let i=0; i < str.length; i++) {
+    if (str.charAt(i) == needle) {
+        if (!--nth) {
+           return i;    
+        }
+    }
+  }
+  return -1;
+}
+
+function getJSONPayload(str) {
+  let splits = str.split(',');
+  let result = [splits.shift(), splits.shift()];
+  let sliceFrom = nthOcurrence(str, ',', 2);
+  if(sliceFrom === -1) {
+    throw new Error(`Improperly formatted packet: ${str}`);
+  }
+  let body = str.slice(sliceFrom);
+  result.push(body);
+
+  return {
+    header: result[0],
+    suffix: result[1],
+    body: result[2]
+  };
+}
+//------------------------------------
 
 function connectToBle() {
   // Connect to a device by passing the service UUID
-  blueTooth.connect("a5f125c0-7cec-4334-9214-58cffb8706c0", gotCharacteristics);
+  blueTooth.connect("8dcb402c-b6f0-4b0b-9c7e-9903b9d0e9a7", gotCharacteristics);
   console.log('trying to connect');
 }
 
@@ -18,12 +51,11 @@ function gotCharacteristics(error, characteristics) {
     return;
   }
 
-
   for (let i=0; i<2; i++) {
-    if (characteristics[i].uuid == 'a5f125c1-7cec-4334-9214-58cffb8706c0') {
+    if (characteristics[i].uuid == '8dcb402d-b6f0-4b0b-9c7e-9903b9d0e9a7') {
       blueToothTXCharacteristic = characteristics[i];
     }
-    if (characteristics[i].uuid == 'a5f125c2-7cec-4334-9214-58cffb8706c0') {
+    if (characteristics[i].uuid == '8dcb402e-b6f0-4b0b-9c7e-9903b9d0e9a7') {
       blueToothRXCharacteristic = characteristics[i];
     }
   }
@@ -88,6 +120,18 @@ function gotValue(value) {
     }
   }
 
+  //update splitString[0] to message.header
+  if(splitString[0] === 'status') {
+    let message = getJSONPayload(value);
+    if(message.suffix === 'w') {
+      statusJSON = message.body;
+    } else if (message.suffix === 'a') {
+      statusJSON = `${statusJSON}${message.body}`;
+    } else if (message.suffix === 'f') {
+      statusObject = JSON.parse(statusJSON);
+      statusJSON = '';
+    }
+  }
 
   if (splitString[0]=='ssid') {//ssid string
     firstConnected = false;
@@ -518,21 +562,21 @@ function gotValue(value) {
   if (splitString[0]=='mqsske') {//mqtt user 
     if(splitString[1] === 'w') {
       mqttSSLKey.value(splitString[2]);
-    } else {
+    } else if(splitString[1] === 'a') {
       mqttSSLKey.value(mqttSSLKey.value() + splitString[2]);
-    }
+    } 
   }
   if (splitString[0]=='mqssce') {//mqtt user 
     if(splitString[1] === 'w') {
       mqttSSLCert.value(splitString[2]);
-    } else {
+    } else if(splitString[1] === 'a') {
       mqttSSLCert.value(mqttSSLCert.value() + splitString[2]);
     }
   }
   if (splitString[0]=='mqssca') {//mqtt user 
     if(splitString[1] === 'w') {
       mqttSSLCA.value(splitString[2]);
-    } else {
+    } else if(splitString[1] === 'a') {
       mqttSSLCA.value(mqttSSLCA.value() + splitString[2]);
     }
   }
