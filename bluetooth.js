@@ -21,7 +21,7 @@ function getJSONPayload(str) {
   if(sliceFrom === -1) {
     throw new Error(`Improperly formatted packet: ${str}`);
   }
-  let body = str.slice(sliceFrom);
+  let body = str.slice(sliceFrom+1);
   result.push(body);
 
   return {
@@ -75,50 +75,6 @@ function gotCharacteristics(error, characteristics) {
 function gotValue(value) {
   // console.log('value: ', value);
   let splitString = split(value, ',');
-  if (splitString[0]=='stat') {//status string
-    newData=true;
-    if (OTAisActive) {
-      OTAisActive = false;
-      //OTAinProgress=" ";
-      showAllParam();
-    }
-    if (splitString[1]=='co') {
-      wifiConnected=true;
-    } else {
-      wifiConnected=false;
-    }
-    batteryVoltage = splitString[2];
-    if (splitString[3]=='op') {
-      contactOpen=true;
-    } else {
-      contactOpen=false;
-    }
-    if (splitString[4]=='bt') {
-      buttonPressed=true;
-    } else {
-      buttonPressed=false;
-    }
-    macAddress = splitString[5];
-    fwVersion = splitString[6];
-    ipAddress = splitString[7];
-    connectedSSID = splitString[8];
-    //here is where time can go
-    if (splitString[9]!=null) {
-      document.getElementById("currentTimeID").innerHTML = splitString[9];
-    }
-
-    if (wifiConnected) {
-      otaStartButton.show();
-      otaHelpTextTitle.hide();
-    } else {
-      otaStartButton.hide();
-      otaHelpTextTitle.show();
-    }
-
-    if (firstConnected) {
-      sendData("#param,");
-    }
-  }
 
   //update splitString[0] to message.header
   if(splitString[0] === 'status') {
@@ -130,6 +86,37 @@ function gotValue(value) {
     } else if (message.suffix === 'f') {
       statusObject = JSON.parse(statusJSON);
       statusJSON = '';
+      newData=true;
+      if (OTAisActive) {
+        OTAisActive = false;
+        //OTAinProgress=" ";
+        showAllParam();
+      }
+      wifiConnected = statusObject.wifiConnected;
+      batteryVoltage = statusObject.battery;
+      contactOpen = statusObject.contact == 'open';
+      buttonPressed = statusObject.wakeButton;
+      macAddress = statusObject.mac;
+      fwVersion = statusObject.firmware;
+      ipAddress = statusObject.ip;
+      connectedSSID = statusObject.ssid;
+      if(statusObject.rtc) {
+        document.getElementById("currentTimeID").innerHTML = statusObject.rtc;
+      }
+
+      if (wifiConnected) {
+        otaStartButton.show();
+        otaHelpTextTitle.hide();
+      } else {
+        otaStartButton.hide();
+        otaHelpTextTitle.show();
+      }
+  
+      //this will ask the device for its config
+      if (firstConnected) {
+        console.log(statusObject);
+        sendData("#param,");
+      }
     }
   }
 
