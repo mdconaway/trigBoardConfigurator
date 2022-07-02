@@ -18,9 +18,10 @@ function splitStringBySegmentLength(source, segmentLength) {
   } 
   const target = [];
   for (
-      const array = Array.from(source);
-      array.length;
-      target.push(array.splice(0,segmentLength).join('')));
+    const array = Array.from(source);
+    array.length;
+    target.push(array.splice(0,segmentLength).join(''))
+  );
   return target;
 }
 
