@@ -19,9 +19,6 @@ let LEDblinkStartTime;
 let OTAinProgress=" ";
 let OTAisActive = false;
 let firstConnected = true;
-let udpEnabled = false;
-let tcpEnabled = false;
-//let binFileInput;
 
 function preload() {
   trigBoardImg = loadImage('data/trigBoard.png');

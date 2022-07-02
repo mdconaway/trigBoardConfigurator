@@ -691,25 +691,23 @@ function otaStartCommand() {
 }
 
 function udptcpSelectorCommand() {
-  udpEnabled = false;
-  tcpEnabled = false;
-  if (udptcpSelector.value()=="Not Enabled") {
+  if (udptcpSelector.value() === "Not Enabled") {
     sendData("#udd");
-  } else
-    if (udptcpSelector.value()=="udp") {
-      sendData("#ude");
-    } else
-      if (udptcpSelector.value()=="tcp") {
-        sendData("#tce");
-      }
+  } else if (udptcpSelector.value() === "udp") {
+    sendData("#ude");
+  } else if (udptcpSelector.value() === "tcp") {
+    sendData("#tce");
+  }
 }
 
 function readDocsCommand() {
   window.open('https://trigboard-docs.readthedocs.io/en/latest/configurator.html');
 }
+
 function contactCommand() {
   window.open('https://www.kdcircuits.com#contact');
 }
+
 function otaGUICommand() {
   window.open('https://github.com/krdarrah/trigUpdater/releases');
 }

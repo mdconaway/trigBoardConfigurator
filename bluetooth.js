@@ -1,7 +1,7 @@
 //------------------------------------
 //Experimental JSON features
 let statusJSON = '';
-let statusObject = {};
+let configJSON = '';
 
 function nthOcurrence(str, needle, nth) {
   for (let i=0; i < str.length; i++) {
@@ -15,7 +15,16 @@ function nthOcurrence(str, needle, nth) {
 }
 
 function getJSONPayload(str) {
-  let splits = str.split(',');
+  let splits = `${str}`.split(',');
+
+  if(splits.length <= 2) {
+    return {
+      header: splits[0],
+      suffix: splits[1],
+      body: undefined
+    };
+  }
+
   let result = [splits.shift(), splits.shift()];
   let sliceFrom = nthOcurrence(str, ',', 2);
   if(sliceFrom === -1) {
@@ -70,320 +79,378 @@ function gotCharacteristics(error, characteristics) {
   blueTooth.onDisconnected(onDisconnected);
 }
 
-
 // A function that will be called once got values
 function gotValue(value) {
-  // console.log('value: ', value);
-  let splitString = split(value, ',');
+  const { header, suffix, body } = getJSONPayload(value);
 
-  //update splitString[0] to message.header
-  if(splitString[0] === 'status') {
-    let message = getJSONPayload(value);
-    if(message.suffix === 'w') {
-      statusJSON = message.body;
-    } else if (message.suffix === 'a') {
-      statusJSON = `${statusJSON}${message.body}`;
-    } else if (message.suffix === 'f') {
-      statusObject = JSON.parse(statusJSON);
-      statusJSON = '';
-      newData=true;
-      if (OTAisActive) {
-        OTAisActive = false;
-        //OTAinProgress=" ";
-        showAllParam();
-      }
-      wifiConnected = statusObject.wifiConnected;
-      batteryVoltage = statusObject.battery;
-      contactOpen = statusObject.contact == 'open';
-      buttonPressed = statusObject.wakeButton;
-      macAddress = statusObject.mac;
-      fwVersion = statusObject.firmware;
-      ipAddress = statusObject.ip;
-      connectedSSID = statusObject.ssid;
-      if(statusObject.rtc) {
-        document.getElementById("currentTimeID").innerHTML = statusObject.rtc;
-      }
+  if(header === 'status') {
+    handleStatusChunk(suffix, body);
+  } else if(header === 'config') { //batch config
+    handleConfigChunk(suffix, body);
+  } else if (header === 'mqsske') { //mqtt ssl key 
+    handleSSLKeyChunk(suffix, body, mqttSSLKey);
+  } else if (header === 'mqssce') { //mqtt ssl cert 
+    handleSSLKeyChunk(suffix, body, mqttSSLCert);
+  } else if (header === 'mqssca') { //mqtt ssl ca 
+    handleSSLKeyChunk(suffix, body, mqttSSLCA);
+  } else if (header === 'OTAprog') {//OTA IS IN PROGRESS
+    handleOTAMessage(suffix);
+  }
+}
 
-      if (wifiConnected) {
-        otaStartButton.show();
-        otaHelpTextTitle.hide();
-      } else {
-        otaStartButton.hide();
-        otaHelpTextTitle.show();
-      }
-  
-      //this will ask the device for its config
-      if (firstConnected) {
-        console.log(statusObject);
-        sendData("#param,");
-      }
+function handleStatusChunk(suffix, body) {
+  if(suffix === 'w') {
+    statusJSON = body;
+  } else if (suffix === 'a') {
+    statusJSON = `${statusJSON}${body}`;
+  } else if (suffix === 'f') {
+    let statusObject = JSON.parse(statusJSON);
+    statusJSON = '';
+    newData=true;
+    if (OTAisActive) {
+      OTAisActive = false;
+      //OTAinProgress=" ";
+      showAllParam();
+    }
+    wifiConnected = statusObject.wifiConnected;
+    batteryVoltage = statusObject.battery;
+    contactOpen = statusObject.contact == 'open';
+    buttonPressed = statusObject.wakeButton;
+    macAddress = statusObject.mac;
+    fwVersion = statusObject.firmware;
+    ipAddress = statusObject.ip;
+    connectedSSID = statusObject.ssid;
+    if(statusObject.rtc) {
+      document.getElementById("currentTimeID").innerHTML = statusObject.rtc;
+    }
+
+    if (wifiConnected) {
+      otaStartButton.show();
+      otaHelpTextTitle.hide();
+    } else {
+      otaStartButton.hide();
+      otaHelpTextTitle.show();
+    }
+    setNTPUpdateOptions();
+    //this will ask the device for its config
+    if (firstConnected) {
+      console.log(statusObject);
+      sendData("#param,");
     }
   }
+}
 
-  if (splitString[0]=='ssid') {//ssid string
-    firstConnected = false;
-    ssidInput.value(splitString[1]);
+function handleConfigChunk(suffix, body) {
+  if(suffix === 'w') {
+    configJSON = body;
+  } else if (suffix === 'a') {
+    configJSON = `${configJSON}${body}`;
+  } else if (suffix === 'f') {
+    let configObject = JSON.parse(configJSON);
+    configJSON = '';
+    handleConfig(configObject);
   }
-  if (splitString[0]=='pw') {//pw string
-    pwInput.value(splitString[1]);
-  }
-  if (splitString[0]=='tout') {//timeout
-    wifiTimeoutInput.value(splitString[1]/1000);
-  }
-  if (splitString[0]=='name') {//name
-    trigBoardNameInput.value(splitString[1]);
-  }
-  if (splitString[0]=='sel') {//selection
-    triggerOpensTitle.hide();
-    triggerOpensInput.hide();
-    triggerOpensButton.hide();
-    triggerClosesTitle.hide();
-    triggerClosesInput.hide();
-    triggerClosesButton.hide();
-    if (splitString[1]=='Close') {
-      triggerSelector.value('Contact Close');
-      triggerClosesTitle.show();
-      triggerClosesInput.show();
-      triggerClosesButton.show();
-    }
-    if (splitString[1]=='Open') {
-      triggerSelector.value('Contact Open');
-      triggerOpensTitle.show();
-      triggerOpensInput.show();
-      triggerOpensButton.show();
-    }    
-    if (splitString[1]=='Both') {
-      triggerSelector.value('Open and Close');
-      triggerOpensTitle.show();
-      triggerOpensInput.show();
-      triggerOpensButton.show();
-      triggerClosesTitle.show();
-      triggerClosesInput.show();
-      triggerClosesButton.show();
-    }
-  }
-  if (splitString[0]=='ope') {//open message
-    triggerOpensInput.value(splitString[1]);
-  }
-  if (splitString[0]=='clo') {//close message
-    triggerClosesInput.value(splitString[1]);
+}
+
+function handleSSLKeyChunk(mode, message, input) {
+  if(mode === 'w') {
+    input.value(message);
+  } else if(mode === 'a') {
+    input.value(input.value() + message);
   } 
-  if (splitString[0]=='tim') {//countdown
-    timerInput.value(splitString[1]);
-  }
-  if (splitString[0]=='tse') {//timer select
-    if (splitString[1]=='Nothing') {
-      timerSelector.value('Nothing');
-      timerStillOpenTitle.hide();
-      timerStillOpenInput.hide();
-      timerStillOpenButton.hide();
-      timerStillClosedTitle.hide();
-      timerStillClosedInput.hide();
-      timerStillClosedButton.hide();
-    }
-    if (splitString[1]=='Closed') {
-      timerSelector.value('Contact Still Closed');
-      timerStillOpenTitle.hide();
-      timerStillOpenInput.hide();
-      timerStillOpenButton.hide();
-      timerStillClosedTitle.show();
-      timerStillClosedInput.show();
-      timerStillClosedButton.show();
-    }
-    if (splitString[1]=='Open') {
-      timerSelector.value('Contact Still Open');
-      timerStillOpenTitle.show();
-      timerStillOpenInput.show();
-      timerStillOpenButton.show();
-      timerStillClosedTitle.hide();
-      timerStillClosedInput.hide();
-      timerStillClosedButton.hide();
-    }
-    if (splitString[1]=='Either') {
-      timerSelector.value('Either Contact');
-      timerStillOpenTitle.show();
-      timerStillOpenInput.show();
-      timerStillOpenButton.show();
-      timerStillClosedTitle.show();
-      timerStillClosedInput.show();
-      timerStillClosedButton.show();
-    }
-  }
-  if (splitString[0]=='tso') {//still open
-    timerStillOpenInput.value(splitString[1]);
-  }
-  if (splitString[0]=='tsc') {//still closed
-    timerStillClosedInput.value(splitString[1]);
-  }  
-  if (splitString[0]=='lob') {//voltage
-    loBatteryInput.value(splitString[1]);
-  }
-  if (splitString[0]=='bof') {//battery offset
-    batteryOffsetInput.value(splitString[1]);
-  } 
+}
 
+function handleOTAMessage(msg) {
+  OTAinProgress = msg;
+  OTAisActive = true;
+  hideAllParam();
+}
 
+function handleConfig(config) {
+  firstConnected = false;
+  const {
+    ssid,
+    pw,
+    tout,
+    name,
+    sel,
+    ope,
+    clo,
+    tim,
+    tse,
+    tso,
+    tsc,
+    lob,
+    bof,
+    poe,
+    pouser,
+    poapi,
+    wak,
+    pse,
+    psk,
+    ife,
+    ifk,
+    telegramEnable,
+    telegramBOT,
+    telegramCHAT,
+    ude,
+    tce,
+    udt,
+    uds,
+    udg,
+    udb,
+    uddns,
+    uddnss,
+    udsi,
+    udpw,
+    udport,
+    rtcm,
+    mqe,
+    mqp,
+    mqs,
+    mqt,
+    mqse,
+    mqsu,
+    mqsp,
+    sipen,
+    sip,
+    gip,
+    suip,
+    pdnsip,
+    sdnsip,
+    udpBla,
+    udpTim,
+    highSpd,
+    clkEnable,
+    clkTimeZone,
+    clkAppendEnable,
+    clkAlarmEnable,
+    clkAlarmHour,
+    clkAlarmMinute,
+    clkUpdateNTPenable,
+    clkAlarmMessage,
+    clkAppendAlmEnable,
+    appendRSSI,
+    missionEnable,
+    missionTimeafter
+  } = config;
 
-  if (splitString[0]=='poe') {//push over enable
-    if (splitString[1]=='t') {
-      pushOverEnableCheckbox.checked(true);
-      pushCredentTitle.show();
-      pushuserTitle.show();
-      pushuserInput.show();
-      pushapiTitle.show();
-      pushapiInput.show();
-      pushOverSaveButton.show();
-    } else {
-      pushOverEnableCheckbox.checked(false);
-      pushCredentTitle.hide();
-      pushuserTitle.hide();
-      pushuserInput.hide();
-      pushapiTitle.hide();
-      pushapiInput.hide();
-      pushOverSaveButton.hide();
-    }
-  } 
-  if (splitString[0]=='pouser') {//user key
-    pushuserInput.value(splitString[1]);
-  }  
-  if (splitString[0]=='poapi') {//api key
-    pushapiInput.value(splitString[1]);
+  ssidInput.value(ssid);
+  pwInput.value(pw);
+  wifiTimeoutInput.value(tout/1000);
+  trigBoardNameInput.value(name);
+  //sel-------------------
+  triggerOpensTitle.hide();
+  triggerOpensInput.hide();
+  triggerOpensButton.hide();
+  triggerClosesTitle.hide();
+  triggerClosesInput.hide();
+  triggerClosesButton.hide();
+  if (sel === 'Close') {
+    triggerSelector.value('Contact Close');
+    triggerClosesTitle.show();
+    triggerClosesInput.show();
+    triggerClosesButton.show();
+  } else if (sel === 'Open') {
+    triggerSelector.value('Contact Open');
+    triggerOpensTitle.show();
+    triggerOpensInput.show();
+    triggerOpensButton.show();
+  } else if (sel === 'Both') {
+    triggerSelector.value('Open and Close');
+    triggerOpensTitle.show();
+    triggerOpensInput.show();
+    triggerOpensButton.show();
+    triggerClosesTitle.show();
+    triggerClosesInput.show();
+    triggerClosesButton.show();
   }
-  if (splitString[0]=='wak') {//wake button message
-    wakeButtonInput.value(splitString[1]);
+  //----------------------
+  triggerOpensInput.value(ope);
+  triggerClosesInput.value(clo); 
+  timerInput.value(tim);
+  //timer select----------
+  if (tse === 'Nothing') {
+    timerSelector.value('Nothing');
+    timerStillOpenTitle.hide();
+    timerStillOpenInput.hide();
+    timerStillOpenButton.hide();
+    timerStillClosedTitle.hide();
+    timerStillClosedInput.hide();
+    timerStillClosedButton.hide();
+  } else if (tse === 'Closed') {
+    timerSelector.value('Contact Still Closed');
+    timerStillOpenTitle.hide();
+    timerStillOpenInput.hide();
+    timerStillOpenButton.hide();
+    timerStillClosedTitle.show();
+    timerStillClosedInput.show();
+    timerStillClosedButton.show();
+  } else if (tse === 'Open') {
+    timerSelector.value('Contact Still Open');
+    timerStillOpenTitle.show();
+    timerStillOpenInput.show();
+    timerStillOpenButton.show();
+    timerStillClosedTitle.hide();
+    timerStillClosedInput.hide();
+    timerStillClosedButton.hide();
+  } else if (tse === 'Either') {
+    timerSelector.value('Either Contact');
+    timerStillOpenTitle.show();
+    timerStillOpenInput.show();
+    timerStillOpenButton.show();
+    timerStillClosedTitle.show();
+    timerStillClosedInput.show();
+    timerStillClosedButton.show();
   }
-
-  if (splitString[0]=='pse') {//push safer enable
-    if (splitString[1]=='t') {
-      pushSaferEnableCheckbox.checked(true);
-      pushSaferTitle.show();
-      pushSaferKeyTitle.show();
-      pushSaferInput.show();
-      pushSaferSaveButton.show();
-    } else {
-      pushSaferEnableCheckbox.checked(false);
-      pushSaferTitle.hide();
-      pushSaferKeyTitle.hide();
-      pushSaferInput.hide();
-      pushSaferSaveButton.hide();
-    }
+  //--------------------
+  timerStillOpenInput.value(tso);
+  timerStillClosedInput.value(tsc);
+  loBatteryInput.value(lob);
+  batteryOffsetInput.value(bof);
+  //push over enable----
+  if (poe === 't') {
+    pushOverEnableCheckbox.checked(true);
+    pushCredentTitle.show();
+    pushuserTitle.show();
+    pushuserInput.show();
+    pushapiTitle.show();
+    pushapiInput.show();
+    pushOverSaveButton.show();
+  } else {
+    pushOverEnableCheckbox.checked(false);
+    pushCredentTitle.hide();
+    pushuserTitle.hide();
+    pushuserInput.hide();
+    pushapiTitle.hide();
+    pushapiInput.hide();
+    pushOverSaveButton.hide();
   }
-  if (splitString[0]=='psk') {//push safer key
-    pushSaferInput.value(splitString[1]);
+  //--------------------
+  pushuserInput.value(pouser);
+  pushapiInput.value(poapi);
+  wakeButtonInput.value(wak);
+  //push safer enable---
+  if (pse === 't') {
+    pushSaferEnableCheckbox.checked(true);
+    pushSaferTitle.show();
+    pushSaferKeyTitle.show();
+    pushSaferInput.show();
+    pushSaferSaveButton.show();
+  } else {
+    pushSaferEnableCheckbox.checked(false);
+    pushSaferTitle.hide();
+    pushSaferKeyTitle.hide();
+    pushSaferInput.hide();
+    pushSaferSaveButton.hide();
   }
-  if (splitString[0]=='ife') {//ifttt enable
-    if (splitString[1]=='t') {
-      iftttEnableCheckbox.checked(true);
-      iftttTitle.show();
-      iftttKeyTitle.show();
-      iftttInput.show();
-      iftttSaveButton.show();
-    } else {
-      iftttEnableCheckbox.checked(false);
-      iftttTitle.hide();
-      iftttKeyTitle.hide();
-      iftttInput.hide();
-      iftttSaveButton.hide();
-    }
+  //--------------------
+  pushSaferInput.value(psk);
+  //ifttt enable--------
+  if (ife === 't') {
+    iftttEnableCheckbox.checked(true);
+    iftttTitle.show();
+    iftttKeyTitle.show();
+    iftttInput.show();
+    iftttSaveButton.show();
+  } else {
+    iftttEnableCheckbox.checked(false);
+    iftttTitle.hide();
+    iftttKeyTitle.hide();
+    iftttInput.hide();
+    iftttSaveButton.hide();
   }
-  if (splitString[0]=='ifk') {//ifttt key
-    iftttInput.value(splitString[1]);
+  //--------------------
+  iftttInput.value(ifk);
+  //telegram enabled----
+  if (telegramEnable === 't') {
+    telegramEnableCheckbox.checked(true);
+    telegramCredentTitle.show();
+    telegramBOTTitle.show();
+    telegramBOTInput.show();
+    telegramCHATTitle.show();
+    telegramCHATInput.show();
+    telegramSaveButton.show();
+  } else {
+    iftttEnableCheckbox.checked(false);
+    telegramCredentTitle.hide();
+    telegramBOTTitle.hide();
+    telegramBOTInput.hide();
+    telegramCHATTitle.hide();
+    telegramCHATInput.hide();
+    telegramSaveButton.hide();
   }
-  if (splitString[0]=='telegramEnable') {//telegram enable
-    if (splitString[1]=='t') {
-      telegramEnableCheckbox.checked(true);
-      telegramCredentTitle.show();
-      telegramBOTTitle.show();
-      telegramBOTInput.show();
-      telegramCHATTitle.show();
-      telegramCHATInput.show();
-      telegramSaveButton.show();
-    } else {
-      iftttEnableCheckbox.checked(false);
-      telegramCredentTitle.hide();
-      telegramBOTTitle.hide();
-      telegramBOTInput.hide();
-      telegramCHATTitle.hide();
-      telegramCHATInput.hide();
-      telegramSaveButton.hide();
-    }
+  //-------------------
+  telegramBOTInput.value(telegramBOT);
+  telegramCHATInput.value(telegramCHAT);
+  //udp enable---------
+  let udpEnabled = false;
+  if (ude === 't') {
+    udpEnabled = true;
+    udptcpSelector.value('udp');
+    tcpReCountTitle.hide();
+    udpTitle.show();
+    tcpTitle.hide();
+    udpSSIDTitle.show();
+    udpSSIDInput.show();
+    udpPWTitle.show();
+    udpPWInput.show();
+    udpStaticIPTitle.show();
+    udpStaticIPInput.show();
+    udpTargetIPTitle.show();
+    udpTargetIPInput.show();
+    udpPortTitle.show();
+    udpPortInput.show();
+    udpGatewayTitle.show();
+    udpGatewayInput.show();
+    udpSubnetTitle.show();
+    udpSubnetInput.show();
+    udpPrimaryDNSTitle.show();
+    udpPrimaryDNSInput.show();
+    udpSecondaryDNSTitle.show();
+    udpSecondaryDNSInput.show();
+    udpSaveButton.show();
+    udpBlastCountTitle.show();
+    udpBlastCountInput.show();
+    udpBlastTimeTitle.show();
+    udpBlastTimeInput.show();
   }
-  if (splitString[0]=='telegramBOT') {//telegram bot token
-    telegramBOTInput.value(splitString[1]);
+  //------------------
+  //tcp enable--------
+  let tcpEnabled = false;
+  if (tce === 't') {
+    tcpEnabled=true;
+    udptcpSelector.value('tcp');
+    udpTitle.hide();
+    tcpTitle.show();
+    udpSSIDTitle.show();
+    udpSSIDInput.show();
+    udpPWTitle.show();
+    udpPWInput.show();
+    udpStaticIPTitle.show();
+    udpStaticIPInput.show();
+    udpTargetIPTitle.show();
+    udpTargetIPInput.show();
+    udpPortTitle.hide();
+    udpPortInput.hide();
+    udpGatewayTitle.show();
+    udpGatewayInput.show();
+    udpSubnetTitle.show();
+    udpSubnetInput.show();
+    udpPrimaryDNSTitle.show();
+    udpPrimaryDNSInput.show();
+    udpSecondaryDNSTitle.show();
+    udpSecondaryDNSInput.show();
+    udpSaveButton.show();
+    tcpReCountTitle.show();
+    udpBlastCountTitle.hide();
+    udpBlastCountInput.show();
+    udpBlastTimeTitle.hide();
+    udpBlastTimeInput.hide();
   }
-  if (splitString[0]=='telegramCHAT') {//telegram chat ID
-    telegramCHATInput.value(splitString[1]);
-  }
-
-
-  if (splitString[0]=='ude') {//udp enable
-    udpEnabled=false;
-    if (splitString[1]=='t') {
-      udpEnabled=true;
-      udptcpSelector.value('udp');
-      tcpReCountTitle.hide();
-      udpTitle.show();
-      tcpTitle.hide();
-      udpSSIDTitle.show();
-      udpSSIDInput.show();
-      udpPWTitle.show();
-      udpPWInput.show();
-      udpStaticIPTitle.show();
-      udpStaticIPInput.show();
-      udpTargetIPTitle.show();
-      udpTargetIPInput.show();
-      udpPortTitle.show();
-      udpPortInput.show();
-      udpGatewayTitle.show();
-      udpGatewayInput.show();
-      udpSubnetTitle.show();
-      udpSubnetInput.show();
-      udpPrimaryDNSTitle.show();
-      udpPrimaryDNSInput.show();
-      udpSecondaryDNSTitle.show();
-      udpSecondaryDNSInput.show();
-      udpSaveButton.show();
-      udpBlastCountTitle.show();
-      udpBlastCountInput.show();
-      udpBlastTimeTitle.show();
-      udpBlastTimeInput.show();
-    }
-  }
-  if (splitString[0]=='tce') {//tcp enable
-    tcpEnabled=false;
-    if (splitString[1]=='t') {
-      tcpEnabled=true;
-      udptcpSelector.value('tcp');
-      udpTitle.hide();
-      tcpTitle.show();
-      udpSSIDTitle.show();
-      udpSSIDInput.show();
-      udpPWTitle.show();
-      udpPWInput.show();
-      udpStaticIPTitle.show();
-      udpStaticIPInput.show();
-      udpTargetIPTitle.show();
-      udpTargetIPInput.show();
-      udpPortTitle.hide();
-      udpPortInput.hide();
-      udpGatewayTitle.show();
-      udpGatewayInput.show();
-      udpSubnetTitle.show();
-      udpSubnetInput.show();
-      udpPrimaryDNSTitle.show();
-      udpPrimaryDNSInput.show();
-      udpSecondaryDNSTitle.show();
-      udpSecondaryDNSInput.show();
-      udpSaveButton.show();
-      tcpReCountTitle.show();
-      udpBlastCountTitle.hide();
-      udpBlastCountInput.show();
-      udpBlastTimeTitle.hide();
-      udpBlastTimeInput.hide();
-    }
-  }  
-
-  if (!udpEnabled && !tcpEnabled && (splitString[0]=='tce' || splitString[0]=='ude')) {
+  //------------------
+  //common udp/tcp options
+  if (!udpEnabled && !tcpEnabled) {
     udptcpSelector.value('Not Enabled');
     tcpTitle.hide();
     udpTitle.hide();
@@ -412,366 +479,239 @@ function gotValue(value) {
     udpBlastTimeInput.hide();
     tcpReCountTitle.hide();
   }
+  //------------------
+  udpTargetIPInput.value(udt);
+  udpStaticIPInput.value(uds);
+  udpGatewayInput.value(udg);
+  udpSubnetInput.value(udb);
+  udpPrimaryDNSInput.value(uddns);
+  udpSecondaryDNSInput.value(uddnss);
+  udpSSIDInput.value(udsi);
+  udpPWInput.value(udpw);
+  udpPortInput.value(udport);
+  timerUnitSelector.value(rtcm === 't' ? 'Minutes' : 'Seconds');
+  //mqtt enable--------
+  if (mqe === 't') {
+    mqttEnableCheckbox.checked(true);
+    mqttTitle.show();
+    mqttPortTitle.show();
+    mqttPortInput.show();
+    mqttServerTitle.show();
+    mqttServerInput.show();
+    mqttTopicTitle.show();
+    mqttTopicInput.show();
+    mqttSaveButton.show();
+    mqttSecEnableTitle.show();
+    mqttSecEnableCheckbox.show();
+    mqttSecEnableButton.show();
+  } else {
+    mqttEnableCheckbox.checked(false);
+    mqttTitle.hide();
+    mqttPortTitle.hide();
+    mqttPortInput.hide();
+    mqttServerTitle.hide();
+    mqttServerInput.hide();
+    mqttTopicTitle.hide();
+    mqttTopicInput.hide();
+    mqttSaveButton.hide();
+    mqttSecEnableTitle.hide();
+    mqttSecEnableCheckbox.hide();
+    mqttSecEnableButton.hide();
+    mqttUserTitle.hide();
+    mqttUserInput.hide();
+    mqttPWTitle.hide();
+    mqttPWInput.hide();
+    mqttSSLKeyTitle.hide();
+    mqttSSLKey.hide();
+    mqttSSLKeySaveButton.hide();
+    mqttSSLCertTitle.hide();
+    mqttSSLCert.hide();
+    mqttSSLCertSaveButton.hide();
+    mqttSSLCATitle.hide();
+    mqttSSLCA.hide();
+    mqttSSLCASaveButton.hide();
+  }
+  //-----------------
+  mqttPortInput.value(mqp);
+  mqttServerInput.value(mqs);
+  mqttTopicInput.value(mqt);
+  //mqtt sec enable 
+  if (mqse === 't') {
+    mqttSecEnableCheckbox.checked(true);
+    mqttUserTitle.show();
+    mqttUserInput.show();
+    mqttPWTitle.show();
+    mqttPWInput.show();
+    mqttSSLKeyTitle.show();
+    mqttSSLKey.show();
+    mqttSSLKeySaveButton.show();
+    mqttSSLCertTitle.show();
+    mqttSSLCert.show();
+    mqttSSLCertSaveButton.show();
+    mqttSSLCATitle.show();
+    mqttSSLCA.show();
+    mqttSSLCASaveButton.show();
+  } else {
+    mqttSecEnableCheckbox.checked(false);
+    mqttUserTitle.hide();
+    mqttUserInput.hide();
+    mqttPWTitle.hide();
+    mqttPWInput.hide();
+    mqttSSLKeyTitle.hide();
+    mqttSSLKey.hide();
+    mqttSSLKeySaveButton.hide();
+    mqttSSLCertTitle.hide();
+    mqttSSLCert.hide();
+    mqttSSLCertSaveButton.hide();
+    mqttSSLCATitle.hide();
+    mqttSSLCA.hide();
+    mqttSSLCASaveButton.hide();
+  }
+  //-----------------
+  mqttUserInput.value(mqsu);
+  mqttPWInput.value(mqsp);
+  //static ip enable-
+  if (sipen === 't') {
+    staticEnableCheckbox.checked(true);
+    staticIPTitle.show();
+    staticIPInput.show();
+    staticGatewayTitle.show();
+    staticSubnetInput.show();
+    staticPrimaryDNSTitle.show();
+    staticPrimaryDNSInput.show();
+    staticSecondaryDNSTitle.show();
+    staticSecondaryDNSInput.show();
+    staticSaveButton.show();
+    staticGatewayInput.show();
+    staticSubnetTitle.show();
+  } else {
+    staticEnableCheckbox.checked(false);
+    staticIPTitle.hide();
+    staticIPInput.hide();
+    staticGatewayTitle.hide();
+    staticSubnetInput.hide();
+    staticPrimaryDNSTitle.hide();
+    staticPrimaryDNSInput.hide();
+    staticSecondaryDNSTitle.hide();
+    staticSecondaryDNSInput.hide();
+    staticSaveButton.hide();
+    staticGatewayInput.hide();
+    staticSubnetTitle.hide();
+  }
+  //---------------
+  staticIPInput.value(sip);
+  staticGatewayInput.value(gip);
+  staticSubnetInput.value(suip);
+  staticPrimaryDNSInput.value(pdnsip);
+  staticSecondaryDNSInput.value(sdnsip);
+  udpBlastCountInput.value(udpBla);
+  udpBlastTimeInput.value(udpTim);
+  highSpeedEnableCheckbox.checked(highSpd === 't');
+  //clock enable----
+  if (clkEnable === 't') {
+    clockTimerEnableCheckbox.checked(true);
+    clockCurrentTime.show();
+    clockTimeZoneTitle.show();
+    clockTimeZone.show();
+    clockTimeZoneButton.show();
+    clockSetTimeNTPtitle.show();
+    clockAppendTitle.show();
+    clockAppendCheckbox.show();
+    clockAppendButton.show();
+    clockAlarmEnableTitle.show();
+    clockAlarmEnableCheckbox.show();
+    clockAlarmEnableButton.show();
+  } else {
+    clockTimerEnableCheckbox.checked(false);
+    clockCurrentTime.hide();
+    clockTimeZoneTitle.hide();
+    clockTimeZone.hide();
+    clockTimeZoneButton.hide();
+    clockSetTimeNTPtitle.hide();
+    clockSetTimeButton.hide();
+    clockAppendTitle.hide();
+    clockAppendCheckbox.hide();
+    clockAppendButton.hide();
+    clockAlarmEnableTitle.hide();
+    clockAlarmEnableCheckbox.hide();
+    clockAlarmEnableButton.hide();
+    clockAlarmSettingTitle.hide();
+    clockAlarmHour.hide();
+    clockAlarmMinute.hide();
+    clockAlarmButton.hide();
+    clockNTPupdateonAlarmTitle.hide();
+    clockNTPupdateonAlarmCheckbox.hide();
+    clockNTPupdateonAlarmButton.hide();
+    clockAlarmMessageTitle.hide();
+    clockAlarmMessage.hide();
+    clockAlarmMessageButton.hide();
+  }
+  //------------------
+  clockTimeZone.value(clkTimeZone);
+  clockAppendCheckbox.checked(clkAppendEnable === 't');
+  //clock append enable
+  if (clkAlarmEnable === 't') {
+    clockAlarmEnableCheckbox.checked(true);
+    clockAlarmSettingTitle.show();
+    clockAlarmHour.show();
+    clockAlarmMinute.show();
+    clockAlarmButton.show();
+    clockNTPupdateonAlarmTitle.show();
+    clockNTPupdateonAlarmCheckbox.show();
+    clockNTPupdateonAlarmButton.show();
+    clockAlarmMessageTitle.show();
+    clockAlarmMessage.show();
+    clockAlarmMessageButton.show();
+    clockAppendAlarmTitle.show();
+    clockAppendAlarmCheckbox.show();
+    clockAppendAlarmButton.show();
+  } else {
+    clockAlarmEnableCheckbox.checked(false);
+    clockAlarmSettingTitle.hide();
+    clockAlarmHour.hide();
+    clockAlarmMinute.hide();
+    clockAlarmButton.hide();
+    clockNTPupdateonAlarmTitle.hide();
+    clockNTPupdateonAlarmCheckbox.hide();
+    clockNTPupdateonAlarmButton.hide();
+    clockAlarmMessageTitle.hide();
+    clockAlarmMessage.hide();
+    clockAlarmMessageButton.hide();
+    clockAppendAlarmTitle.hide();
+    clockAppendAlarmCheckbox.hide();
+    clockAppendAlarmButton.hide();
+  }
+  //-----------------
+  clockAlarmHour.value(clkAlarmHour);
+  clockAlarmMinute.value(clkAlarmMinute);
+  clockNTPupdateonAlarmCheckbox.checked(clkUpdateNTPenable === 't');
+  clockAlarmMessage.value(clkAlarmMessage);
+  clockAppendAlarmCheckbox.checked(clkAppendAlmEnable === 't');
+  appendRSSIenableCheckbox.checked(appendRSSI === 't');
+  //mission critical enable
+  if (missionEnable === 't') {
+    missionCriticalEnableCheckbox.checked(true);
+    missionCriticalTimeTitle.show();
+    missionCriticalTimeInput.show();
+    missionCriticalTimeButton.show();
+  } else {
+    missionCriticalEnableCheckbox.checked(false);
+    missionCriticalTimeTitle.hide();
+    missionCriticalTimeInput.hide();
+    missionCriticalTimeButton.hide();
+  }
+  //----------------
+  missionCriticalTimeInput.value(missionTimeafter);
+  setNTPUpdateOptions();
+}
 
-  if (splitString[0]=='udt') {//udp settings
-    udpTargetIPInput.value(splitString[1]);
-  }
-  if (splitString[0]=='uds') {//udp settings
-    udpStaticIPInput.value(splitString[1]);
-  } 
-  if (splitString[0]=='udg') {//udp settings
-    udpGatewayInput.value(splitString[1]);
-  }  
-  if (splitString[0]=='udb') {//udp settings
-    udpSubnetInput.value(splitString[1]);
-  }
-  if (splitString[0]=='uddns') {//udp settings
-    udpPrimaryDNSInput.value(splitString[1]);
-  } 
-  if (splitString[0]=='uddnss') {//udp settings
-    udpSecondaryDNSInput.value(splitString[1]);
-  }
-  if (splitString[0]=='udsi') {//udp settings
-    udpSSIDInput.value(splitString[1]);
-  }
-  if (splitString[0]=='udpw') {//udp settings
-    udpPWInput.value(splitString[1]);
-  }
-  if (splitString[0]=='udport') {//udp settings
-    udpPortInput.value(splitString[1]);
-  }
-
-  if (splitString[0]=='rtcm') {//timer units 
-    if (splitString[1]=='t') {
-      timerUnitSelector.value('Minutes');
-    } else {
-      timerUnitSelector.value('Seconds');
-    }
-  }
-  if (splitString[0]=='mqe') {//mqtt enable
-    if (splitString[1]=='t') {
-      mqttEnableCheckbox.checked(true);
-      mqttTitle.show();
-      mqttPortTitle.show();
-      mqttPortInput.show();
-      mqttServerTitle.show();
-      mqttServerInput.show();
-      mqttTopicTitle.show();
-      mqttTopicInput.show();
-      mqttSaveButton.show();
-      mqttSecEnableTitle.show();
-      mqttSecEnableCheckbox.show();
-      mqttSecEnableButton.show();
-      //mqttUserTitle.show();
-      //mqttUserInput.show();
-      //mqttPWTitle.show();
-      //mqttPWInput.show();
-    } else {
-      mqttEnableCheckbox.checked(false);
-      mqttTitle.hide();
-      mqttPortTitle.hide();
-      mqttPortInput.hide();
-      mqttServerTitle.hide();
-      mqttServerInput.hide();
-      mqttTopicTitle.hide();
-      mqttTopicInput.hide();
-      mqttSaveButton.hide();
-      mqttSecEnableTitle.hide();
-      mqttSecEnableCheckbox.hide();
-      mqttSecEnableButton.hide();
-      mqttUserTitle.hide();
-      mqttUserInput.hide();
-      mqttPWTitle.hide();
-      mqttPWInput.hide();
-      mqttSSLKeyTitle.hide();
-      mqttSSLKey.hide();
-      mqttSSLCertTitle.hide();
-      mqttSSLCert.hide();
-      mqttSSLCATitle.hide();
-      mqttSSLCA.hide();
-    }
-  }
-
-  if (splitString[0]=='mqp') {//mqtt port 
-    mqttPortInput.value(splitString[1]);
-  }
-
-  if (splitString[0]=='mqs') {//mqtt server 
-    mqttServerInput.value(splitString[1]);
-  }
-  if (splitString[0]=='mqt') {//mqtt topic 
-    mqttTopicInput.value(splitString[1]);
-  }
-
-
-  if (splitString[0]=='mqse') {//mqtt sec enable 
-    if (splitString[1]=='t') {
-      mqttSecEnableCheckbox.checked(true);
-      mqttUserTitle.show();
-      mqttUserInput.show();
-      mqttPWTitle.show();
-      mqttPWInput.show();
-      mqttSSLKeyTitle.show();
-      mqttSSLKey.show();
-      mqttSSLKeySaveButton.show();
-      mqttSSLCertTitle.show();
-      mqttSSLCert.show();
-      mqttSSLCertSaveButton.show();
-      mqttSSLCATitle.show();
-      mqttSSLCA.show();
-      mqttSSLCASaveButton.show();
-    } else {
-      mqttSecEnableCheckbox.checked(false);
-      mqttUserTitle.hide();
-      mqttUserInput.hide();
-      mqttPWTitle.hide();
-      mqttPWInput.hide();
-      mqttSSLKey.hide();
-      mqttSSLKeySaveButton.hide();
-      mqttSSLCertTitle.hide();
-      mqttSSLCert.hide();
-      mqttSSLCertSaveButton.hide();
-      mqttSSLCATitle.hide();
-      mqttSSLCA.hide();
-      mqttSSLCASaveButton.hide();
-    }
-  }
-
-  if (splitString[0]=='mqsu') {//mqtt user 
-    mqttUserInput.value(splitString[1]);
-  }
-  if (splitString[0]=='mqsp') {//mqtt user 
-    mqttPWInput.value(splitString[1]);
-  }
-  if (splitString[0]=='mqsp') {//mqtt user 
-    mqttPWInput.value(splitString[1]);
-  }
-  if (splitString[0]=='mqsske') {//mqtt user 
-    if(splitString[1] === 'w') {
-      mqttSSLKey.value(splitString[2]);
-    } else if(splitString[1] === 'a') {
-      mqttSSLKey.value(mqttSSLKey.value() + splitString[2]);
-    } 
-  }
-  if (splitString[0]=='mqssce') {//mqtt user 
-    if(splitString[1] === 'w') {
-      mqttSSLCert.value(splitString[2]);
-    } else if(splitString[1] === 'a') {
-      mqttSSLCert.value(mqttSSLCert.value() + splitString[2]);
-    }
-  }
-  if (splitString[0]=='mqssca') {//mqtt user 
-    if(splitString[1] === 'w') {
-      mqttSSLCA.value(splitString[2]);
-    } else if(splitString[1] === 'a') {
-      mqttSSLCA.value(mqttSSLCA.value() + splitString[2]);
-    }
-  }
-  if (splitString[0]=='sipen') {//static ip enable 
-    if (splitString[1]=='t') {
-      staticEnableCheckbox.checked(true);
-      staticIPTitle.show();
-      staticIPInput.show();
-      staticGatewayTitle.show();
-      staticSubnetInput.show();
-      staticPrimaryDNSTitle.show();
-      staticPrimaryDNSInput.show();
-      staticSecondaryDNSTitle.show();
-      staticSecondaryDNSInput.show();
-      staticSaveButton.show();
-      staticGatewayInput.show();
-      staticSubnetTitle.show();
-    } else {
-      staticEnableCheckbox.checked(false);
-      staticIPTitle.hide();
-      staticIPInput.hide();
-      staticGatewayTitle.hide();
-      staticSubnetInput.hide();
-      staticPrimaryDNSTitle.hide();
-      staticPrimaryDNSInput.hide();
-      staticSecondaryDNSTitle.hide();
-      staticSecondaryDNSInput.hide();
-      staticSaveButton.hide();
-      staticGatewayInput.hide();
-      staticSubnetTitle.hide();
-    }
-  }
-  if (splitString[0]=='sip') {//static ip
-    staticIPInput.value(splitString[1]);
-  }
-  if (splitString[0]=='gip') {//gateway ip
-    staticGatewayInput.value(splitString[1]);
-  }
-  if (splitString[0]=='suip') {//subnet ip
-    staticSubnetInput.value(splitString[1]);
-  }  
-  if (splitString[0]=='pdnsip') {//prim dns
-    staticPrimaryDNSInput.value(splitString[1]);
-  }
-  if (splitString[0]=='sdnsip') {//sec dns
-    staticSecondaryDNSInput.value(splitString[1]);
-  }
-  if (splitString[0]=='udpBla') {//udp blast count
-    udpBlastCountInput.value(splitString[1]);
-  }
-  if (splitString[0]=='udpTim') {//udp time
-    udpBlastTimeInput.value(splitString[1]);
-  }
-
-  if (splitString[0]=='highSpd') {//high speed mode
-    if (splitString[1]=='t') {
-      highSpeedEnableCheckbox.checked(true);
-    } else {
-      highSpeedEnableCheckbox.checked(false);
-    }
-  }
-  if (splitString[0]=='clkEnable') {//clock enable
-    if (splitString[1]=='t') {
-      clockTimerEnableCheckbox.checked(true);
-      clockCurrentTime.show();
-      clockTimeZoneTitle.show();
-      clockTimeZone.show();
-      clockTimeZoneButton.show();
-      clockSetTimeNTPtitle.show();
-      clockAppendTitle.show();
-      clockAppendCheckbox.show();
-      clockAppendButton.show();
-      clockAlarmEnableTitle.show();
-      clockAlarmEnableCheckbox.show();
-      clockAlarmEnableButton.show();
-    } else {
-      clockTimerEnableCheckbox.checked(false);
-      clockCurrentTime.hide();
-      clockTimeZoneTitle.hide();
-      clockTimeZone.hide();
-      clockTimeZoneButton.hide();
-      clockSetTimeNTPtitle.hide();
-      clockSetTimeButton.hide();
-      clockAppendTitle.hide();
-      clockAppendCheckbox.hide();
-      clockAppendButton.hide();
-      clockAlarmEnableTitle.hide();
-      clockAlarmEnableCheckbox.hide();
-      clockAlarmEnableButton.hide();
-      clockAlarmSettingTitle.hide();
-      clockAlarmHour.hide();
-      clockAlarmMinute.hide();
-      clockAlarmButton.hide();
-      clockNTPupdateonAlarmTitle.hide();
-      clockNTPupdateonAlarmCheckbox.hide();
-      clockNTPupdateonAlarmButton.hide();
-      clockAlarmMessageTitle.hide();
-      clockAlarmMessage.hide();
-      clockAlarmMessageButton.hide();
-    }
-  }
-
+function setNTPUpdateOptions() {
   if (wifiConnected && clockTimerEnableCheckbox.checked()) {
     document.getElementById("clockSetTimeNTPtitleID").innerHTML = "Set Time with NTP server ";
     clockSetTimeButton.show();
   } else {
     document.getElementById("clockSetTimeNTPtitleID").innerHTML = "Note: Connect to WiFi to set Time from NTP Server! ";
     clockSetTimeButton.hide();
-  }
-
-  if (splitString[0]=='clkTimeZone') {//clock time zone
-    clockTimeZone.value(splitString[1]);
-  }
-  if (splitString[0]=='clkAppendEnable') {//clock append enable
-    if (splitString[1]=='t') {
-      clockAppendCheckbox.checked(true);
-    } else {
-      clockAppendCheckbox.checked(false);
-    }
-  }
-  if (splitString[0]=='clkAlarmEnable') {//clock append enable
-    if (splitString[1]=='t') {
-      clockAlarmEnableCheckbox.checked(true);
-      clockAlarmSettingTitle.show();
-      clockAlarmHour.show();
-      clockAlarmMinute.show();
-      clockAlarmButton.show();
-      clockNTPupdateonAlarmTitle.show();
-      clockNTPupdateonAlarmCheckbox.show();
-      clockNTPupdateonAlarmButton.show();
-      clockAlarmMessageTitle.show();
-      clockAlarmMessage.show();
-      clockAlarmMessageButton.show();
-      clockAppendAlarmTitle.show();
-      clockAppendAlarmCheckbox.show();
-      clockAppendAlarmButton.show();
-    } else {
-      clockAlarmEnableCheckbox.checked(false);
-      clockAlarmSettingTitle.hide();
-      clockAlarmHour.hide();
-      clockAlarmMinute.hide();
-      clockAlarmButton.hide();
-      clockNTPupdateonAlarmTitle.hide();
-      clockNTPupdateonAlarmCheckbox.hide();
-      clockNTPupdateonAlarmButton.hide();
-      clockAlarmMessageTitle.hide();
-      clockAlarmMessage.hide();
-      clockAlarmMessageButton.hide();
-      clockAppendAlarmTitle.hide();
-      clockAppendAlarmCheckbox.hide();
-      clockAppendAlarmButton.hide();
-    }
-  }
-  if (splitString[0]=='clkAlarmHour') {//clock alarm hour
-    clockAlarmHour.value(splitString[1]);
-  }
-  if (splitString[0]=='clkAlarmMinute') {//clock alarm hour
-    clockAlarmMinute.value(splitString[1]);
-  }
-  if (splitString[0]=='clkUpdateNPTenable') {//clock NPT update
-    if (splitString[1]=='t') {
-      clockNTPupdateonAlarmCheckbox.checked(true);
-    } else {
-      clockNTPupdateonAlarmCheckbox.checked(false);
-    }
-  }
-  if (splitString[0]=='clkAlarmMessage') {//clock alarm message
-    clockAlarmMessage.value(splitString[1]);
-  }
-  if (splitString[0]=='clkAppendAlmEnable') {//clock alarm append time
-    if (splitString[1]=='t') {
-      clockAppendAlarmCheckbox.checked(true);
-    } else {
-      clockAppendAlarmCheckbox.checked(false);
-    }
-  }
-
-  if (splitString[0]=='appendRSSI') {//append rssi
-    if (splitString[1]=='t') {
-      appendRSSIenableCheckbox.checked(true);
-    } else {
-      appendRSSIenableCheckbox.checked(false);
-    }
-  }
-
-  if (splitString[0]=='missionEnable') {//mission critical enable
-    if (splitString[1]=='t') {
-      missionCriticalEnableCheckbox.checked(true);
-      missionCriticalTimeTitle.show();
-      missionCriticalTimeInput.show();
-      missionCriticalTimeButton.show();
-    } else {
-      missionCriticalEnableCheckbox.checked(false);
-      missionCriticalTimeTitle.hide();
-      missionCriticalTimeInput.hide();
-      missionCriticalTimeButton.hide();
-    }
-  }
-
-  if (splitString[0]=='missionTimeafter') {//mission critical time
-    missionCriticalTimeInput.value(splitString[1]);
-  }
-
-
-  if (splitString[0]=='OTAprog') {//OTA IS IN PROGRESS
-    OTAinProgress=splitString[1];
-    OTAisActive = true;
-    hideAllParam();
   }
 }
 
@@ -787,7 +727,8 @@ function sendData(data) {
   const inputValue = data;
   if (!("TextEncoder" in window)) {
     console.log("Sorry, this browser does not support TextEncoder...");
+    return;
   }
-  var enc = new TextEncoder(); // always utf-8
+  const enc = new TextEncoder(); // always utf-8
   return blueToothTXCharacteristic.writeValue(enc.encode(inputValue));
 }
