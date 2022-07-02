@@ -26,7 +26,7 @@ function splitStringBySegmentLength(source, segmentLength) {
 }
 
 //A method to break data across multiple writes
-const tryChunks = function (dataStrings) {
+function tryChunks (dataStrings) {
   if(dataStrings.length) {
     let data = dataStrings.shift();
     console.log(`Sending[${data.length}B]: ${data}`);
@@ -105,6 +105,7 @@ function clockTimerEnableCommand() {
     sendData("#clkdi");
   }
 }
+
 function clockTimeZoneButtonCommand() {
   let sanitizer = checkUserString(clockTimeZone.value(), 5);
   if (sanitizer!=null) {
@@ -121,10 +122,12 @@ function clockTimeZoneButtonCommand() {
   }
   sendData("#clkzn,"+clockTimeZone.value());
 }
+
 function clockSetTimeNTPCommand() {
   document.getElementById("currentTimeID").innerHTML = "PLEASE WAIT... GETTING TIME";
   sendData("#clkNTPset,");
 }
+
 function clockAppendCommand() {
   if (clockAppendCheckbox.checked()) {
     sendData("#clkappen");
@@ -132,6 +135,7 @@ function clockAppendCommand() {
     sendData("#clkappdi");
   }
 }
+
 function clockAppendAlarmCommand() {
   if (clockAppendAlarmCheckbox.checked()) {
     sendData("#clkalmappen");
@@ -139,6 +143,7 @@ function clockAppendAlarmCommand() {
     sendData("#clkalmappdi");
   }
 }
+
 function clockAlarmEnableCommand() {
   if (clockAlarmEnableCheckbox.checked()) {
     sendData("#clkalmen");
@@ -146,6 +151,7 @@ function clockAlarmEnableCommand() {
     sendData("#clkalmdi");
   }
 }
+
 function clockAlarmButtonCommand() {
   let sanitizer = checkUserString(clockAlarmHour.value(), 5);
   if (sanitizer!=null) {
@@ -176,6 +182,7 @@ function clockAlarmButtonCommand() {
   }
   sendData("#clkalmtim,"+clockAlarmHour.value() + "," + clockAlarmMinute.value());
 }
+
 function clockNTPupdateonAlarmCommand() {
   if (clockNTPupdateonAlarmCheckbox.checked()) {
     sendData("#clkNTPen");
@@ -183,6 +190,7 @@ function clockNTPupdateonAlarmCommand() {
     sendData("#clkNTPdi");
   }
 }
+
 function clockAlarmMessageButtonCommand() {
   let sanitizer = checkUserString(clockAlarmMessage.value(), 50);
   if (sanitizer!=null) {
@@ -209,6 +217,7 @@ function saveWiFi() {
   }
   sendData("#wifi,"+ssidInput.value() + "," + pwInput.value());
 }
+
 function wifiTimeoutCommand() {
   let sanitizer = checkUserString(wifiTimeoutInput.value(), 3);
   if (sanitizer!=null) {
@@ -247,6 +256,7 @@ function triggerOpensCommand() {
   }
   sendData("#ope,"+triggerOpensInput.value());
 }
+
 function triggerClosesCommand() {
   let sanitizer = checkUserString(triggerClosesInput.value(), 50);
   if (sanitizer!=null) {
@@ -255,6 +265,7 @@ function triggerClosesCommand() {
   }
   sendData("#clo,"+triggerClosesInput.value());
 }
+
 function timerCommand() {
   let sanitizer = checkUserString(timerInput.value(), 4);
   if (sanitizer!=null) {
@@ -271,6 +282,7 @@ function timerCommand() {
   }
   sendData("#tim,"+timerInput.value());
 }
+
 function timerSelectorCommand() {
   sendData("#tse,"+trim(timerSelector.value()));
 }
@@ -283,6 +295,7 @@ function timerStillOpenCommand() {
   }
   sendData("#tso,"+timerStillOpenInput.value());
 }
+
 function timerStillClosedCommand() {
   let sanitizer = checkUserString(timerStillClosedInput.value(), 50);
   if (sanitizer!=null) {
@@ -291,6 +304,7 @@ function timerStillClosedCommand() {
   }
   sendData("#tsc,"+timerStillClosedInput.value());
 }
+
 function loBatteryCommand() {
   let sanitizer = checkUserString(loBatteryInput.value(), 5);
   if (sanitizer!=null) {
@@ -307,6 +321,7 @@ function loBatteryCommand() {
   }
   sendData("#lob,"+loBatteryInput.value());
 }
+
 function pushOverSaveCommand() {
   let sanitizer = checkUserString(pushuserInput.value(), 50);
   if (sanitizer!=null) {
@@ -320,9 +335,11 @@ function pushOverSaveCommand() {
   }
   sendData("#pov,"+pushuserInput.value() +","+pushapiInput.value());
 }
+
 function pushOverTestCommand() {
   sendData("#pot");
 }
+
 function wakeButtonCommand() {
   let sanitizer = checkUserString(wakeButtonInput.value(), 50);
   if (sanitizer!=null) {
@@ -331,6 +348,7 @@ function wakeButtonCommand() {
   }
   sendData("#wak,"+wakeButtonInput.value());
 }
+
 function killCommand() {
   sendData("#kill,");
 }
@@ -367,6 +385,7 @@ function iftttEnableCommand() {
     sendData("#ifd");
   }
 }
+
 function iftttKeySaveCommand() {
   let sanitizer = checkUserString(iftttInput.value(), 50);
   if (sanitizer!=null) {
@@ -397,14 +416,6 @@ function telegramSaveCommand() {
   }
   sendData("#telcrd,"+telegramBOTInput.value() +","+telegramCHATInput.value());
 }
-
-//function udpEnableCommand() {
-//  if (udpEnableCheckbox.checked()) {
-//    sendData("#ude");
-//  } else {
-//    sendData("#udd");
-//  }
-//}
 
 function udpSaveCommand() {//we also use this for saving tcp settings
   let sanitize = checkUserString(udpSSIDInput.value(), 50);
@@ -564,11 +575,6 @@ function mqttKeySaveCommand() {
     mqttUserInput.value(sanitize);
     return;
   }
-  //sanitize = checkUserIPaddress(mqttServerInput.value());
-  //if (sanitize!=null) {
-  //  mqttServerInput.value(sanitize);
-  //  return;
-  //}
   sanitize = checkUserString(mqttServerInput.value(), 50);
   if (sanitize!=null) {
     mqttServerInput.value(sanitize);
@@ -595,7 +601,6 @@ function mqttKeySaveCommand() {
   sendData("#mqset,"+mqttPortInput.value()+","+mqttServerInput.value()+","+mqttTopicInput.value()+","+mqttPWInput.value()+","+mqttUserInput.value());
 }
 
-
 function mqttSecEnableCommand() {
   if (mqttSecEnableCheckbox.checked()) {
     sendData("#mqsen");
@@ -611,6 +616,7 @@ function staticEnableCommand() {
     sendData("#sipdi");
   }
 }
+
 function highSpeedCommand() {
   if (highSpeedEnableCheckbox.checked()) {
     sendData("#highSpdON");
