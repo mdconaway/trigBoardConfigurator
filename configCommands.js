@@ -11,7 +11,7 @@ function packetizeMessage(command, message) {
   return tryChunks(commandStrings);
 }
 
-//ALL DATA SENT OUT FROM THE GUI TOO THE BOARD HERE
+//ALL DATA SENT OUT FROM THE GUI TO THE BOARD HERE
 function splitStringBySegmentLength(source, segmentLength) {
   if (!segmentLength || segmentLength < 1) {
     throw Error('Segment length must be defined and greater than/equal to 1');
