@@ -19,6 +19,23 @@ let LEDblinkStartTime;
 let OTAinProgress=" ";
 let OTAisActive = false;
 let firstConnected = true;
+const triggerMapper = {
+  'Contact Close': 'Close',
+  'Contact Open': 'Open',
+  'Open and Close': 'Both',
+  'Close': 'Contact Close',
+  'Open': 'Contact Open',
+  'Both': 'Open and Close'
+};
+const timerSelectMapper = {
+  'Nothing': 'Nothing',
+  'Contact Still Closed': 'Closed',
+  'Contact Still Open': 'Open',
+  'Either Contact': 'Either',
+  'Closed': 'Contact Still Closed',
+  'Open': 'Contact Still Open',
+  'Either': 'Either Contact'
+};
 
 function preload() {
   trigBoardImg = loadImage('data/trigBoard.png');

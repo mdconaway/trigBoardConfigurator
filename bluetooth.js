@@ -47,7 +47,7 @@ function connectToBle() {
   console.log('trying to connect');
 }
 
-// A function that will be called once got characteristics
+// A function that will be called once we get characteristics
 function gotCharacteristics(error, characteristics) {
   console.log('looking for characteristics');
   if (error) { 
@@ -79,7 +79,7 @@ function gotCharacteristics(error, characteristics) {
   blueTooth.onDisconnected(onDisconnected);
 }
 
-// A function that will be called once got values
+// A function that will be called once we get values
 function gotValue(value) {
   const { header, suffix, body } = getJSONPayload(value);
 
@@ -246,18 +246,16 @@ function handleConfig(config) {
   triggerClosesTitle.hide();
   triggerClosesInput.hide();
   triggerClosesButton.hide();
+  triggerSelector.value(triggerMapper[sel]);
   if (sel === 'Close') {
-    triggerSelector.value('Contact Close');
     triggerClosesTitle.show();
     triggerClosesInput.show();
     triggerClosesButton.show();
   } else if (sel === 'Open') {
-    triggerSelector.value('Contact Open');
     triggerOpensTitle.show();
     triggerOpensInput.show();
     triggerOpensButton.show();
   } else if (sel === 'Both') {
-    triggerSelector.value('Open and Close');
     triggerOpensTitle.show();
     triggerOpensInput.show();
     triggerOpensButton.show();
@@ -270,8 +268,8 @@ function handleConfig(config) {
   triggerClosesInput.value(clo); 
   timerInput.value(tim);
   //timer select----------
+  timerSelector.value(timerSelectMapper[tse]);
   if (tse === 'Nothing') {
-    timerSelector.value('Nothing');
     timerStillOpenTitle.hide();
     timerStillOpenInput.hide();
     timerStillOpenButton.hide();
@@ -279,7 +277,6 @@ function handleConfig(config) {
     timerStillClosedInput.hide();
     timerStillClosedButton.hide();
   } else if (tse === 'Closed') {
-    timerSelector.value('Contact Still Closed');
     timerStillOpenTitle.hide();
     timerStillOpenInput.hide();
     timerStillOpenButton.hide();
@@ -287,7 +284,6 @@ function handleConfig(config) {
     timerStillClosedInput.show();
     timerStillClosedButton.show();
   } else if (tse === 'Open') {
-    timerSelector.value('Contact Still Open');
     timerStillOpenTitle.show();
     timerStillOpenInput.show();
     timerStillOpenButton.show();
@@ -295,7 +291,6 @@ function handleConfig(config) {
     timerStillClosedInput.hide();
     timerStillClosedButton.hide();
   } else if (tse === 'Either') {
-    timerSelector.value('Either Contact');
     timerStillOpenTitle.show();
     timerStillOpenInput.show();
     timerStillOpenButton.show();

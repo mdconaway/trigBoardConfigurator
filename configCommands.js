@@ -11,7 +11,7 @@ function packetizeMessage(command, message) {
   return tryChunks(commandStrings);
 }
 
-//ALL DATA SENT OUT FROM THE GUI TO THE BOARD HERE
+// ALL DATA SENT OUT FROM THE GUI TO THE BOARD HERE
 function splitStringBySegmentLength(source, segmentLength) {
   if (!segmentLength || segmentLength < 1) {
     throw Error('Segment length must be defined and greater than/equal to 1');
@@ -25,8 +25,8 @@ function splitStringBySegmentLength(source, segmentLength) {
   return target;
 }
 
-//A method to break data across multiple writes
-function tryChunks (dataStrings) {
+// A method to break data across multiple writes
+function tryChunks(dataStrings) {
   if(dataStrings.length) {
     let data = dataStrings.shift();
     console.log(`Sending[${data.length}B]: ${data}`);
@@ -34,36 +34,526 @@ function tryChunks (dataStrings) {
       return tryChunks(dataStrings);
     });
   }
-};
+}
+
+function toTrigboardBoolean(truthy) {
+  return truthy ? 't' : 'f'
+}
 
 // to sanitize strings **********
 function checkUserString(userString, lengthCheck) {
   if (match(userString, "#") != null || match(userString, ",") != null) {
     return 'error no # or comma';
   }
-  if (userString.length >=lengthCheck) {
+  if (userString.length >= lengthCheck) {
     return 'error too long';
   }
   return null;
 }
 
+// validate ip address
 function checkUserIPaddress(userIP) {
   let splitNumbers = split(userIP, '.');
-  if (splitNumbers.length>4 || splitNumbers.length<4) {
+  if (splitNumbers.length > 4 || splitNumbers.length < 4) {
     return 'error not valid';
   }
-  for (let i=0; i<4; i++) {
+  for (let i = 0; i < 4; i++) {
     if (isNaN(splitNumbers[i])) {
       return 'error not valid';
     }
-    if (splitNumbers[i]>255 || splitNumbers[i]<0) {
+    if (splitNumbers[i] > 255 || splitNumbers[i] < 0) {
       return 'error not valid';
     }
   }
   return null;
 }
+
+// Action functions
+function clockSetTimeNTPCommand() {
+  document.getElementById("currentTimeID").innerHTML = "PLEASE WAIT... GETTING TIME";
+  sendData("#clkNTPset,");
+}
+
+function pushOverTestCommand() {
+  sendData("#pot,");
+}
+
+function killCommand() {
+  sendData("#kill,");
+}
+
+function otaStartCommand() {
+  sendData("#otaStart");
+}
+
+function readDocsCommand() {
+  window.open('https://trigboard-docs.readthedocs.io/en/latest/configurator.html');
+}
+
+function contactCommand() {
+  window.open('https://www.kdcircuits.com#contact');
+}
+
+function otaGUICommand() {
+  window.open('https://github.com/krdarrah/trigUpdater/releases');
+}
 //******************
 
+function mqttSSLKeySaveCommand() {
+  let SSLKey = mqttSSLKey.value().trim();
+  packetizeMessage('#mqsslke', SSLKey);
+}
+
+function mqttSSLCertSaveCommand() {
+  let SSLCert = mqttSSLCert.value().trim();
+  packetizeMessage('#mqsslce', SSLCert);
+}
+
+function mqttSSLCASaveCommand() {
+  let SSLCA = mqttSSLCA.value().trim();
+  packetizeMessage('#mqsslca', SSLCA);
+}
+
+function saveConfigCommand() {
+  let errors = 0;
+  let errMessage;
+  const missionCriticalTime = parseInt(missionCriticalTimeInput.value(), 10);
+  const timeZone = parseInt(clockTimeZone.value(), 10);
+  const alarmHour = parseInt(clockAlarmHour.value(), 10);
+  const alarmMinute = parseInt(clockAlarmMinute.value(), 10);
+  const alarmMessage = clockAlarmMessage.value();
+  const ssid = ssidInput.value();
+  const pw = pwInput.value();
+  const wifiTimeout = parseInt(wifiTimeoutInput.value(), 10);
+  const trigboardName = trigBoardNameInput.value();
+  const openMessage = triggerOpensInput.value();
+  const closeMessage = triggerClosesInput.value();
+  const timerValue = parseInt(timerInput.value(), 10);
+  const timerStillOpen = timerStillOpenInput.value();
+  const timerStillClosed = timerStillClosedInput.value();
+  const lowBattery = parseFloat(loBatteryInput.value());
+  const pushoverUser = pushuserInput.value();
+  const pushoverAPI = pushapiInput.value();
+  const wakeButton = wakeButtonInput.value();
+  const pushSaferKey = pushSaferInput.value();
+  const ifttt = iftttInput.value();
+  const telegramBOT = telegramBOTInput.value();
+  const telegramCHAT = telegramCHATInput.value();
+  const udpTcpDisabled = udptcpSelector.value() === "Not Enabled";
+  const batteryOffset = parseFloat(batteryOffsetInput.value());
+  const udpSSID = udpSSIDInput.value();
+  const udpPW = udpPWInput.value();
+  const udpStaticIP = udpStaticIPInput.value();
+  const udpTargetIP = udpTargetIPInput.value();
+  const udpGateway = udpGatewayInput.value();
+  const udpSubnet = udpSubnetInput.value();
+  const udpDNS = udpPrimaryDNSInput.value();
+  const udpSecondaryDNS = udpSecondaryDNSInput.value();
+  const udpPort = parseInt(udpPortInput.value(), 10);
+  const udpBlastCount = parseInt(udpBlastCountInput.value(), 10);
+  const udpBlastTime = parseInt(udpBlastTimeInput.value(), 10);
+  const mqttUser = mqttUserInput.value();
+  const mqttPW = mqttPWInput.value();
+  const mqttServer = mqttServerInput.value();
+  const mqttPort = parseInt(mqttPortInput.value(), 10);
+  const mqttTopic = mqttTopicInput.value();
+  const staticIP = staticIPInput.value();
+  const staticGateway = staticGatewayInput.value();
+  const staticSubnet = staticSubnetInput.value();
+  const staticPrimaryDNS = staticPrimaryDNSInput.value();
+  const staticSecondaryDNS = staticSecondaryDNSInput.value();
+
+  // Mission Critical Timer
+  if (checkUserString(missionCriticalTimeInput.value(), 3) != null || isNaN(missionCriticalTime) || missionCriticalTime > 60 || missionCriticalTime <= 0) {
+    missionCriticalTimeInput.value("err");
+    errors++;
+  }
+  // Clock Time Zone
+  if (checkUserString(clockTimeZone.value(), 5) != null || isNaN(timeZone) || timeZone > 14 || timeZone < -12) {
+    clockTimeZone.value("err");
+    errors++;
+  }
+  // Clock Alarm Hour
+  if (checkUserString(clockAlarmHour.value(), 5) != null || isNaN(alarmHour) || alarmHour > 23 || alarmHour < 0) {
+    clockAlarmHour.value("err");
+    errors++;
+  }
+  // Clock Alarm Minute
+  if (checkUserString(clockAlarmMinute.value(), 5) != null || isNaN(alarmMinute) || alarmMinute > 59 || alarmMinute < 0) {
+    clockAlarmMinute.value("err");
+    errors++;
+  }
+  // Clock Alarm Message
+  errMessage = checkUserString(alarmMessage, 50);
+  if (errMessage != null) {
+    clockAlarmMessage.value(errMessage);
+    errors++;
+  }
+  // Wifi SSID
+  errMessage = checkUserString(ssid, 50);
+  if (errMessage != null) {
+    ssidInput.value(errMessage);
+    errors++;
+  }
+  // WiFi Password
+  errMessage = checkUserString(pw, 50);
+  if (errMessage != null) {
+    ssidInput.value(errMessage);
+    errors++;
+  }
+  if (pw.length < 8) {
+    ssidInput.value('error pw too short');
+    errors++;
+  }
+  // WiFi Timeout
+  if (checkUserString(wifiTimeoutInput.value(), 3) != null || isNaN(wifiTimeout) || wifiTimeout > 60 || wifiTimeout <= 0) {
+    wifiTimeoutInput.value("err");
+    errors++;
+  }
+  // Trigboard Name
+  errMessage = checkUserString(trigboardName, 50)
+  if (errMessage != null) {
+    trigBoardNameInput.value(errMessage);
+    errors++;
+  }
+  // Open Message
+  errMessage = checkUserString(openMessage, 50);
+  if (errMessage != null) {
+    triggerOpensInput.value(errMessage);
+    errors++;
+  }
+  // Close Message
+  errMessage = checkUserString(closeMessage, 50);
+  if (errMessage != null) {
+    triggerClosesInput.value(errMessage);
+    errors++;
+  }
+  // Timer
+  errMessage = checkUserString(timerInput.value(), 4);
+  if (errMessage != null || isNaN(timerValue) || timerValue > 255 || timerValue <= 0) {
+    timerInput.value("err");
+    errors++;
+  }
+  // Timer Still Open
+  errMessage = checkUserString(timerStillOpen, 50);
+  if (errMessage != null) {
+    timerStillOpenInput.value(errMessage);
+    errors++;
+  }
+  // Timer Still Closed
+  errMessage = checkUserString(timerStillClosed, 50);
+  if (errMessage != null) {
+    timerStillClosedInput.value(errMessage);
+    errors++;
+  }
+  // Low Battery
+  errMessage = checkUserString(loBatteryInput.value(), 5);
+  if (errMessage != null || isNaN(lowBattery) || lowBattery > 255 || lowBattery <= 0) {
+    loBatteryInput.value("err");
+    errors++;
+  }
+  // Pushover User
+  errMessage = checkUserString(pushoverUser, 50);
+  if (errMessage != null) {
+    pushuserInput.value("");
+    errors++;
+  }
+  // Pushover API
+  errMessage = checkUserString(pushoverAPI, 50);
+  if (errMessage != null) {
+    pushapiInput.value("");
+    errors++;
+  }
+  // Wake Button
+  errMessage = checkUserString(wakeButton, 50);
+  if (errMessage != null) {
+    wakeButtonInput.value(errMessage);
+    errors++;
+  }
+  // Push Safer Key
+  errMessage = checkUserString(pushSaferKey, 50);
+  if (errMessage != null) {
+    pushSaferInput.value("");
+    errors++;
+  }
+  // IFTTT
+  errMessage = checkUserString(ifttt, 50);
+  if (errMessage != null) {
+    iftttInput.value("");
+    errors++;
+  }
+  // Telegram Bot
+  errMessage = checkUserString(telegramBOT, 50);
+  if (errMessage != null) {
+    telegramBOTInput.value("");
+    errors++;
+  }
+  // Telegram Chat
+  errMessage = checkUserString(telegramCHAT, 50);
+  if (errMessage != null) {
+    telegramCHATInput.value("");
+    errors++;
+  }
+  // Battery Offset
+  if (checkUserString(batteryOffsetInput.value(), 10) != null || isNaN(batteryOffset)) {
+    batteryOffsetInput.value("err");
+    errors++;
+  }
+  // UDP SSID
+  errMessage = checkUserString(udpSSID, 50);
+  if (errMessage != null) {
+    udpSSIDInput.value(errMessage);
+    errors++;
+  }
+  // UDP Password
+  errMessage = checkUserString(udpPW, 50);
+  if (errMessage != null) {
+    udpSSIDInput.value(errMessage);
+    errors++;
+  }
+  // UDP Static IP
+  errMessage = checkUserIPaddress(udpStaticIP);
+  if (errMessage != null) {
+    udpStaticIPInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(udpStaticIP, 20);
+  if (errMessage != null) {
+    udpStaticIPInput.value(errMessage);
+    errors++;
+  }
+  // UDP Target IP
+  errMessage = checkUserIPaddress(udpTargetIP);
+  if (errMessage != null) {
+    udpTargetIPInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(udpTargetIP, 20);
+  if (errMessage != null) {
+    udpTargetIPInput.value(errMessage);
+    errors++;
+  }  
+  // UDP Gateway IP
+  errMessage = checkUserIPaddress(udpGateway);
+  if (errMessage != null) {
+    udpGatewayInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(udpGateway, 20);
+  if (errMessage != null) {
+    udpGatewayInput.value(errMessage);
+    errors++;
+  }
+  // UDP Subnet
+  errMessage = checkUserIPaddress(udpSubnet);
+  if (errMessage != null) {
+    udpSubnetInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(udpSubnet, 20);
+  if (errMessage != null) {
+    udpSubnetInput.value(errMessage);
+    errors++;
+  }
+  // UDP DNS
+  errMessage = checkUserIPaddress(udpDNS);
+  if (errMessage != null) {
+    udpPrimaryDNSInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(udpDNS, 20);
+  if (errMessage != null) {
+    udpPrimaryDNSInput.value(errMessage);
+    errors++;
+  }
+  // UDP Secondary DNS
+  errMessage = checkUserIPaddress(udpSecondaryDNS);
+  if (errMessage != null) {
+    udpSecondaryDNSInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(udpSecondaryDNS, 20);
+  if (errMessage != null) {
+    udpSecondaryDNSInput.value(errMessage);
+    errors++;
+  }
+  // UDP Port
+  if (checkUserString(udpPortInput.value(), 10) != null || isNaN(udpPort) || udpPort <= 0) {
+    udpPortInput.value("err");
+    errors++;
+  }
+  // UDP Blast Count
+  if (checkUserString(udpBlastCountInput.value(), 10) != null || isNaN(udpBlastCount) || udpBlastCount > 100 || udpBlastCount <= 0) {
+    udpBlastCountInput.value("err");
+    errors++;
+  }
+  // UDP Blast Time
+  if (checkUserString(udpBlastTimeInput.value(), 10) != null || isNaN(udpBlastTime) || udpBlastTime > 100 || udpBlastTime <= 0) {
+    udpBlastTimeInput.value("err");
+    errors++;
+  }
+  //MQTT User
+  errMessage = checkUserString(mqttUser, 50);
+  if (errMessage != null) {
+    mqttUserInput.value(errMessage);
+    errors++;
+  }
+  // MQTT Password
+  errMessage = checkUserString(mqttPW, 50);
+  if (errMessage != null) {
+    mqttUserInput.value(errMessage);
+    errors++;
+  }
+  // MQTT Server
+  errMessage = checkUserString(mqttServer, 50);
+  if (errMessage != null) {
+    mqttServerInput.value(errMessage);
+    errors++;
+  }
+  // MQTT Port
+  if (checkUserString(mqttPortInput.value(), 10) != null || isNaN(mqttPort) || mqttPort <= 0) {
+    mqttPortInput.value("err");
+    errors++;
+  }
+  // MQTT Topic
+  errMessage = checkUserString(mqttTopic, 50);
+  if (errMessage != null) {
+    mqttTopicInput.value(errMessage);
+    errors++;
+  }
+  // Static IP
+  errMessage = checkUserIPaddress(staticIP);
+  if (errMessage != null) {
+    staticIPInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(staticIP, 20);
+  if (errMessage != null) {
+    staticIPInput.value(errMessage);
+    errors++;
+  }
+  // Static Gateway
+  errMessage = checkUserIPaddress(staticGateway);
+  if (errMessage != null) {
+    staticGatewayInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(staticGateway, 20);
+  if (errMessage != null) {
+    staticGatewayInput.value(errMessage);
+    errors++;
+  }
+  // Static Subnet
+  errMessage = checkUserIPaddress(staticSubnet);
+  if (errMessage != null) {
+    staticSubnetInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(staticSubnet, 20);
+  if (errMessage != null) {
+    staticSubnetInput.value(errMessage);
+    errors++;
+  }
+  // Static DNS
+  errMessage = checkUserIPaddress(staticPrimaryDNS);
+  if (errMessage != null) {
+    staticPrimaryDNSInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(staticPrimaryDNS, 20);
+  if (errMessage != null) {
+    staticPrimaryDNSInput.value(errMessage);
+    errors++;
+  }
+  // Static Secondary DNS
+  errMessage = checkUserIPaddress(staticSecondaryDNS);
+  if (errMessage != null) {
+    staticSecondaryDNSInput.value(errMessage);
+    errors++;
+  }
+  errMessage = checkUserString(staticSecondaryDNS, 20);
+  if (errMessage != null) {
+    staticSecondaryDNSInput.value(errMessage);
+    errors++;
+  }
+
+  if(errors > 0) {
+    console.log(`There were ${errors} validation errors`);
+    return;
+  }
+
+  const config = {
+    appendRSSI: toTrigboardBoolean(appendRSSIenableCheckbox.checked()),
+    missionEnable: toTrigboardBoolean(missionCriticalEnableCheckbox.checked()),
+    missionTimeafter: missionCriticalTime,
+    clkEnable: toTrigboardBoolean(clockTimerEnableCheckbox.checked()),
+    clkTimeZone: timeZone,
+    clkAppendEnable: toTrigboardBoolean(clockAppendCheckbox.checked()),
+    clkAppendAlmEnable: toTrigboardBoolean(clockAppendAlarmCheckbox.checked()),
+    clkAlarmEnable: toTrigboardBoolean(clockAlarmEnableCheckbox.checked()),
+    clkAlarmHour: alarmHour,
+    clkAlarmMinute: alarmMinute,
+    clkUpdateNTPenable: toTrigboardBoolean(clockNTPupdateonAlarmCheckbox.checked()),
+    clkAlarmMessage: alarmMessage,
+    ssid,
+    pw,
+    tout: wifiTimeout,
+    name: trigboardName,
+    sel: triggerMapper[triggerSelector.value()],
+    ope: openMessage,
+    clo: closeMessage,
+    tim: timerValue,
+    tse: timerSelectMapper[timerSelector.value()],
+    tso: timerStillOpen,
+    tsc: timerStillClosed,
+    lob: lowBattery,
+    bof: batteryOffset,
+    poe: toTrigboardBoolean(pushOverEnableCheckbox.checked()),
+    pouser: pushoverUser,
+    poapi: pushoverAPI,
+    pse: toTrigboardBoolean(pushSaferEnableCheckbox.checked()),
+    psk: pushSaferKey,
+    wak: wakeButton,
+    ife: toTrigboardBoolean(iftttEnableCheckbox.checked()),
+    ifk: ifttt,
+    telegramEnable: toTrigboardBoolean(telegramEnableCheckbox.checked()),
+    telegramBOT,
+    telegramCHAT,
+    rtcm: timerUnitSelector.value() == 'Minutes',
+    mqe: toTrigboardBoolean(mqttEnableCheckbox.checked()),
+    mqse: toTrigboardBoolean(mqttSecEnableCheckbox.checked()),
+    sipen: toTrigboardBoolean(staticEnableCheckbox.checked()),
+    highSpd: toTrigboardBoolean(highSpeedEnableCheckbox.checked()),
+    ude: !udpTcpDisabled && udptcpSelector.value() === "udp",
+    tce: !udpTcpDisabled && udptcpSelector.value() === "tcp",
+    udsi: udpSSID,
+    udpw: udpPW,
+    uds: udpStaticIP,
+    udt: udpTargetIP,
+    udg: udpGateway,
+    udb: udpSubnet,
+    uddns: udpDNS,
+    uddnss: udpSecondaryDNS,
+    udport: udpPort,
+    udpBla: udpBlastCount,
+    udpTim: udpBlastTime,
+    mqsu: mqttUser,
+    mqsp: mqttPW,
+    mqs: mqttServer,
+    mqp: mqttPort,
+    mqt: mqttTopic,
+    sip: staticIP,
+    gip: staticGateway,
+    suip: staticSubnet,
+    pdnsip: staticPrimaryDNS,
+    sdnsip: staticSecondaryDNS
+  };
+
+  // add code to lock UI?
+  packetizeMessage('#config', JSON.stringify(config));
+}
+
+// DELETE EVERYTHING BELOW THIS COMMENT!!! -------------------------
 function appendRSSIenableCommand() {
   if (appendRSSIenableCheckbox.checked()) {
     sendData("#rssien");
@@ -121,11 +611,6 @@ function clockTimeZoneButtonCommand() {
     return;
   }
   sendData("#clkzn,"+clockTimeZone.value());
-}
-
-function clockSetTimeNTPCommand() {
-  document.getElementById("currentTimeID").innerHTML = "PLEASE WAIT... GETTING TIME";
-  sendData("#clkNTPset,");
 }
 
 function clockAppendCommand() {
@@ -211,7 +696,7 @@ function saveWiFi() {
     ssidInput.value(sanitizer);
     return;
   }
-  if (pwInput.value().length <8) {
+  if (pwInput.value().length < 8) {
     ssidInput.value('error pw too short');
     return;
   }
@@ -245,7 +730,7 @@ function trigBoardNameCommand() {
 }
 
 function triggerSelectorCommand() {
-  sendData("#sel,"+triggerSelector.value());
+  sendData("#sel,"+triggerMapper[triggerSelector.value()]);
 }
 
 function triggerOpensCommand() {
@@ -284,7 +769,7 @@ function timerCommand() {
 }
 
 function timerSelectorCommand() {
-  sendData("#tse,"+trim(timerSelector.value()));
+  sendData("#tse,"+trim(timerSelectMapper[timerSelector.value()]));
 }
 
 function timerStillOpenCommand() {
@@ -336,10 +821,6 @@ function pushOverSaveCommand() {
   sendData("#pov,"+pushuserInput.value() +","+pushapiInput.value());
 }
 
-function pushOverTestCommand() {
-  sendData("#pot");
-}
-
 function wakeButtonCommand() {
   let sanitizer = checkUserString(wakeButtonInput.value(), 50);
   if (sanitizer!=null) {
@@ -347,10 +828,6 @@ function wakeButtonCommand() {
     return;
   }
   sendData("#wak,"+wakeButtonInput.value());
-}
-
-function killCommand() {
-  sendData("#kill,");
 }
 
 function pushOverEnableCommand() {
@@ -417,7 +894,72 @@ function telegramSaveCommand() {
   sendData("#telcrd,"+telegramBOTInput.value() +","+telegramCHATInput.value());
 }
 
-function udpSaveCommand() {//we also use this for saving tcp settings
+function timerUnitSelectorCommand() {
+  if (timerUnitSelector.value()=='Minutes') {
+    sendData("#rtcme");
+  } else {
+    sendData("#rtcmd");
+  }
+}
+
+function mqttEnableCommand() {
+  if (mqttEnableCheckbox.checked()) {
+    sendData("#mqen");
+  } else {
+    sendData("#mqdi");
+  }
+}
+
+function mqttSecEnableCommand() {
+  if (mqttSecEnableCheckbox.checked()) {
+    sendData("#mqsen");
+  } else {
+    sendData("#mqsdi");
+  }
+}
+
+function staticEnableCommand() {
+  if (staticEnableCheckbox.checked()) {
+    sendData("#sipen");
+  } else {
+    sendData("#sipdi");
+  }
+}
+
+function highSpeedCommand() {
+  if (highSpeedEnableCheckbox.checked()) {
+    sendData("#highSpdON");
+  } else {
+    sendData("#highSpdOFF");
+  }
+}
+
+function udptcpSelectorCommand() {
+  if (udptcpSelector.value() === "Not Enabled") {
+    sendData("#udd");
+  } else if (udptcpSelector.value() === "udp") {
+    sendData("#ude");
+  } else if (udptcpSelector.value() === "tcp") {
+    sendData("#tce");
+  }
+}
+
+function batteryOffsetCommand() {
+  let sanitizer = checkUserString(batteryOffsetInput.value(), 10);
+  if (sanitizer!=null) {
+    batteryOffsetInput.value("err");
+    return;
+  }
+  if (isNaN(batteryOffsetInput.value())) {
+    loBatteryInput.value("err");
+    return;
+  }
+
+  sendData("#boff,"+batteryOffsetInput.value());
+}
+
+//we also use this for saving tcp settings
+function udpSaveCommand() {
   let sanitize = checkUserString(udpSSIDInput.value(), 50);
   if (sanitize!=null) {
     udpSSIDInput.value(sanitize);
@@ -532,38 +1074,6 @@ function udpSaveCommand() {//we also use this for saving tcp settings
     ","+udpPortInput.value()+ ","+udpBlastCountInput.value()+","+udpBlastTimeInput.value());
 }
 
-function timerUnitSelectorCommand() {
-  if (timerUnitSelector.value()=='Minutes') {
-    sendData("#rtcme");
-  } else {
-    sendData("#rtcmd");
-  }
-}
-
-function mqttEnableCommand() {
-  if (mqttEnableCheckbox.checked()) {
-    sendData("#mqen");
-  } else {
-    sendData("#mqdi");
-  }
-}
-
-//Need to break data transfer into 512 byte chunks
-function mqttSSLKeySaveCommand() {
-  let SSLKey = mqttSSLKey.value().trim();
-  packetizeMessage('#mqsslke', SSLKey);
-}
-
-function mqttSSLCertSaveCommand() {
-  let SSLCert = mqttSSLCert.value().trim();
-  packetizeMessage('#mqsslce', SSLCert);
-}
-
-function mqttSSLCASaveCommand() {
-  let SSLCA = mqttSSLCA.value().trim();
-  packetizeMessage('#mqsslca', SSLCA);
-}
-
 function mqttKeySaveCommand() {
   let sanitize = checkUserString(mqttUserInput.value(), 50);
   if (sanitize!=null) {
@@ -599,44 +1109,6 @@ function mqttKeySaveCommand() {
     return;
   }
   sendData("#mqset,"+mqttPortInput.value()+","+mqttServerInput.value()+","+mqttTopicInput.value()+","+mqttPWInput.value()+","+mqttUserInput.value());
-}
-
-function mqttSecEnableCommand() {
-  if (mqttSecEnableCheckbox.checked()) {
-    sendData("#mqsen");
-  } else {
-    sendData("#mqsdi");
-  }
-}
-
-function staticEnableCommand() {
-  if (staticEnableCheckbox.checked()) {
-    sendData("#sipen");
-  } else {
-    sendData("#sipdi");
-  }
-}
-
-function highSpeedCommand() {
-  if (highSpeedEnableCheckbox.checked()) {
-    sendData("#highSpdON");
-  } else {
-    sendData("#highSpdOFF");
-  }
-}
-
-function batteryOffsetCommand() {
-  let sanitizer = checkUserString(batteryOffsetInput.value(), 10);
-  if (sanitizer!=null) {
-    batteryOffsetInput.value("err");
-    return;
-  }
-  if (isNaN(batteryOffsetInput.value())) {
-    loBatteryInput.value("err");
-    return;
-  }
-
-  sendData("#boff,"+batteryOffsetInput.value());
 }
 
 function staticSaveCommand() {
@@ -689,32 +1161,6 @@ function staticSaveCommand() {
   if (sanitize!=null) {
     staticSecondaryDNSInput.value(sanitize);
     return;
-  } 
-  sendData("#sipset,"+staticIPInput.value()+","+staticGatewayInput.value()+","+staticSubnetInput.value()+","+staticPrimaryDNSInput.value()+","+staticSecondaryDNSInput.value());
-}
-
-function otaStartCommand() {
-  sendData("#otaStart");
-}
-
-function udptcpSelectorCommand() {
-  if (udptcpSelector.value() === "Not Enabled") {
-    sendData("#udd");
-  } else if (udptcpSelector.value() === "udp") {
-    sendData("#ude");
-  } else if (udptcpSelector.value() === "tcp") {
-    sendData("#tce");
   }
-}
-
-function readDocsCommand() {
-  window.open('https://trigboard-docs.readthedocs.io/en/latest/configurator.html');
-}
-
-function contactCommand() {
-  window.open('https://www.kdcircuits.com#contact');
-}
-
-function otaGUICommand() {
-  window.open('https://github.com/krdarrah/trigUpdater/releases');
+  sendData("#sipset,"+staticIPInput.value()+","+staticGatewayInput.value()+","+staticSubnetInput.value()+","+staticPrimaryDNSInput.value()+","+staticSecondaryDNSInput.value());
 }
